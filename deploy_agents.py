@@ -186,6 +186,7 @@ def deploy_agents(
     selected_repos: list,
     selected_agents: list,
     logger: logging.Logger,
+    test_mode: bool = False,
 ) -> list:
     """
     Copy selected agent files into the .github/personas/ folder of each selected
@@ -203,15 +204,17 @@ def deploy_agents(
 
         # Ensure .github/ exists
         if not github_dir.exists():
-            github_dir.mkdir(parents=True, exist_ok=True)
-            msg = f"Created .github directory for repo '{repo_name}'"
+            msg = f"Would create .github directory for repo '{repo_name}'" if test_mode else f"Created .github directory for repo '{repo_name}'"
+            if not test_mode:
+                github_dir.mkdir(parents=True, exist_ok=True)
             logger.info(msg)
             messages.append(msg)
 
         # Ensure .github/agents/ exists
         if not agents_dir.exists():
-            agents_dir.mkdir(parents=True, exist_ok=True)
-            msg = f"Created .github/agents directory for repo '{repo_name}'"
+            msg = f"Would create .github/agents directory for repo '{repo_name}'" if test_mode else f"Created .github/agents directory for repo '{repo_name}'"
+            if not test_mode:
+                agents_dir.mkdir(parents=True, exist_ok=True)
             logger.info(msg)
             messages.append(msg)
 
@@ -224,19 +227,27 @@ def deploy_agents(
                 src_mtime = src.stat().st_mtime
                 dst_mtime = dst.stat().st_mtime
                 if src_mtime > dst_mtime:
-                    shutil.copy2(src, dst)
                     msg = (
+                        f"Would overwrite existing older {agent['deploy_filename']} "
+                        f"file for repo '{repo_name}'"
+                    ) if test_mode else (
                         f"Overwrote existing older {agent['deploy_filename']} "
                         f"file for repo '{repo_name}'"
                     )
+                    if not test_mode:
+                        shutil.copy2(src, dst)
                 else:
                     msg = (
+                        f"Would not overwrite newer {agent['deploy_filename']} "
+                        f"file for repo '{repo_name}'"
+                    ) if test_mode else (
                         f"Did not overwrite newer {agent['deploy_filename']} "
                         f"file for repo '{repo_name}'"
                     )
             else:
-                shutil.copy2(src, dst)
-                msg = f"Copied {agent['deploy_filename']} to repo '{repo_name}'"
+                msg = f"Would copy {agent['deploy_filename']} to repo '{repo_name}'" if test_mode else f"Copied {agent['deploy_filename']} to repo '{repo_name}'"
+                if not test_mode:
+                    shutil.copy2(src, dst)
 
             logger.info(msg)
             messages.append(msg)
@@ -261,12 +272,14 @@ class DeployAgentsApp(tk.Tk):
         repos: list,
         agents: list,
         logger: logging.Logger,
+        test_mode: bool = False,
     ):
         super().__init__()
         self.script_dir = script_dir
         self.all_repos = repos
         self.all_agents = agents
         self.logger = logger
+        self.test_mode = test_mode
 
         self.title("Deploy GitHub Copilot Agents")
         self.resizable(True, True)
@@ -325,8 +338,34 @@ class DeployAgentsApp(tk.Tk):
         self.submit_btn.pack(side=tk.RIGHT)
 
     def _build_repo_panel(self, parent):
+        import os
         frame = ttk.LabelFrame(parent, text="Repositories", padding=6)
         frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
+
+        # Show local repo root path and make it clickable
+        local_root = str(self.script_dir.parent)
+        label_frame = ttk.Frame(frame)
+        label_frame.pack(anchor="w", fill=tk.X)
+        # Clickable link-style label for local repo root
+        def open_explorer(event=None):
+            os.startfile(local_root)
+        # Normal label for description
+        desc_label = ttk.Label(
+            label_frame,
+            text="Your Local Repositories - ",
+            font=("TkDefaultFont", 9, "bold")
+        )
+        desc_label.pack(side=tk.LEFT, anchor="w")
+        # Clickable link-style label for just the path
+        link_label = tk.Label(
+            label_frame,
+            text=local_root,
+            font=("TkDefaultFont", 9, "underline"),
+            fg="blue",
+            cursor="hand2"
+        )
+        link_label.pack(side=tk.LEFT, anchor="w")
+        link_label.bind("<Button-1>", open_explorer)
 
         # "ALL" checkbox
         self.all_repos_var = tk.BooleanVar(value=False)
@@ -338,8 +377,20 @@ class DeployAgentsApp(tk.Tk):
         ).pack(anchor="w")
         ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=4)
 
-        # Scrollable list
-        inner = self._scrollable_inner(frame)
+        # Scrollable list, but with multi-column support
+        outer = ttk.Frame(frame)
+        outer.pack(fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(outer, height=220, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        inner = ttk.Frame(canvas)
+        inner.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.repo_vars: dict = {}
 
         if not self.all_repos:
@@ -347,17 +398,21 @@ class DeployAgentsApp(tk.Tk):
                 inner,
                 text="No sibling repositories found.",
                 foreground=self._DESC_COLOR,
-            ).pack(anchor="w")
+            ).grid(row=0, column=0, sticky="w")
         else:
-            for repo in self.all_repos:
+            # Arrange checkboxes in up to 4 columns
+            num_cols = min(4, max(1, (len(self.all_repos) + 9) // 10))
+            for idx, repo in enumerate(self.all_repos):
                 var = tk.BooleanVar(value=False)
                 self.repo_vars[repo] = var
+                row = idx // num_cols
+                col = idx % num_cols
                 ttk.Checkbutton(
                     inner,
                     text=repo,
                     variable=var,
                     command=self._update_preview,
-                ).pack(anchor="w")
+                ).grid(row=row, column=col, sticky="w", padx=2, pady=1)
 
     def _build_agent_panel(self, parent):
         frame = ttk.LabelFrame(parent, text="Agents", padding=6)
@@ -617,7 +672,10 @@ def main():
         logger.error("No agent files found. Exiting.")
         return
 
-    app = DeployAgentsApp(script_dir, repos, agents, logger)
+    # Check for test mode flag
+    import sys
+    test_mode = '--test' in sys.argv or '--dry-run' in sys.argv
+    app = DeployAgentsApp(script_dir, repos, agents, logger, test_mode=test_mode)
     app.mainloop()
 
     logger.info("deploy_agents.py finished.")
