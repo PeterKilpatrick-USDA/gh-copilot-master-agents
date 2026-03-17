@@ -2,8 +2,30 @@
 name: Agent-Template
 description: 'Describe this agent in one sentence. For example: Senior SE (PhD CS/Ed) persona: cautious, research-heavy, concise with ELI10 analogies, comments generously.'
 tools:
-- list the tools this agent should have access to, for example:
+- select the tools this agent should have access to from the list below. Remove tools that are not relevant to this agent's role and expertise.
+- changes
 - edit
+- extensions
+- fetch
+- githubRepo
+- new
+- openSimpleBrowser
+- problems
+- runCommands
+- runNotebooks
+- runSubagent
+- runTasks
+- runTests
+- search
+- testFailure
+- todos
+- usages
+- vscodeAPI
+
+- ms-python.python/configurePythonEnvironment
+- ms-python.python/getPythonEnvironmentInfo
+- ms-python.python/getPythonExecutableCommand
+- ms-python.python/installPythonPackage
 ---
 
 ## Author: YourName-YourOrg

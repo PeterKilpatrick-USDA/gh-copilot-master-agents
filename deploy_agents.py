@@ -3,28 +3,37 @@
 deploy_agents.py - Deploy GitHub Copilot agent files to selected repositories.
 
 This script provides a Tkinter GUI that allows you to:
-  1. Select which sibling repositories should receive agent files.
-  2. Select which agent (.agent.md) files to copy from the personas/ folder.
-  3. Preview your selection before submitting.
-  4. Automatically create .github/agents/ directories in target repos as needed.
-  5. Copy agents, skipping destination files that are already newer.
+    1. Select which sibling repositories should receive agent files.
+    2. Select which agent (.agent.md) files to copy from the personas/ folder.
+    3. Preview your selection before submitting.
+    4. Automatically create .github/agents/ directories in target repos as needed.
+    5. Copy agents, skipping destination files that are already newer.
 
 All operations are logged with timestamps to the logs/ directory.
 
 Agent files live in the personas/ folder of THIS repository.
-They are deployed into the .github/personas/ folder of each target repository.
+They are deployed into the .github/agents/ folder of each target repository.
 
 Usage:
-    python deploy_agents.py
+        python deploy_agents.py
 """
 
 import logging
-import os
 import shutil
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
 from tkinter import messagebox, ttk
+from typing import TypedDict
+
+
+class AgentRecord(TypedDict):
+    source_filename: str
+    deploy_filename: str
+    stem: str
+    display_name: str
+    description: str
+    path: Path
 
 
 # ---------------------------------------------------------------------------
@@ -36,7 +45,7 @@ def setup_logging(script_dir: Path) -> logging.Logger:
     log_dir = script_dir / "logs"
     log_dir.mkdir(exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"deploy_agents_{timestamp}.log"
+    log_file = log_dir / f"deploy_agents_{timestamp}.log.txt"
 
     logger = logging.getLogger("deploy_agents")
     logger.setLevel(logging.INFO)
@@ -66,7 +75,7 @@ def get_script_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-def find_sibling_repos(script_dir: Path) -> list:
+def find_sibling_repos(script_dir: Path) -> list[str]:
     """
     Return sorted names of sibling directories one level above script_dir.
     Hidden directories (starting with '.') are excluded.
@@ -80,38 +89,36 @@ def find_sibling_repos(script_dir: Path) -> list:
     return repos
 
 
-def find_agent_files(script_dir: Path) -> list:
+def find_agent_files(script_dir: Path) -> list[AgentRecord]:
     """
     Discover all *.md files in the personas/ folder and return metadata dicts.
 
-    Agent files are stored here as plain .md files (e.g. "ui-expert.md") to
-    satisfy repository path restrictions.  They will be deployed into target
-    repos as "<stem>.agent.md" (e.g. "ui-expert.agent.md") which is the
-    naming convention expected by GitHub Copilot.
+    Agent files are stored in the personas/ folder using their final deploy
+    filenames. They are copied into target repos without renaming.
 
     Each dict contains:
-        source_filename  - filename in THIS repo, e.g. "ui-expert.md"
-        deploy_filename  - filename written to target repos, e.g. "ui-expert.agent.md"
+        source_filename  - filename in THIS repo, e.g. "ui-expert.agent.md"
+        deploy_filename  - filename written to target repos, same as source
         stem             - base name, e.g. "ui-expert"
         display_name     - human-friendly label read from frontmatter 'name', e.g. "UI Expert"
         description      - description from frontmatter or first body line
         path             - absolute Path of the source file
     """
     agents_dir = script_dir / "personas"
-    agents = []
+    agents: list[AgentRecord] = []
     if agents_dir.exists():
         for filepath in sorted(agents_dir.glob("*.md")):
-            stem = filepath.stem  # e.g. "ui-expert"
-            agents.append(
-                {
-                    "source_filename": filepath.name,
-                    "deploy_filename": f"{stem}.agent.md",
-                    "stem": stem,
-                    "display_name": _extract_display_name(filepath, stem),
-                    "description": _extract_description(filepath),
-                    "path": filepath,
-                }
-            )
+            filename = filepath.name
+            stem = filename.removesuffix(".agent.md") if filename.endswith(".agent.md") else filepath.stem
+            agent: AgentRecord = {
+                "source_filename": filename,
+                "deploy_filename": filename,
+                "stem": stem,
+                "display_name": _extract_display_name(filepath, stem),
+                "description": _extract_description(filepath),
+                "path": filepath,
+            }
+            agents.append(agent)
     return agents
 
 
@@ -125,14 +132,14 @@ def _stem_to_display_name(stem: str) -> str:
     return stem.replace("-", " ").replace("_", " ").title()
 
 
-def _parse_frontmatter(filepath: Path) -> dict:
+def _parse_frontmatter(filepath: Path) -> dict[str, str]:
     """Parse YAML frontmatter key/value pairs from a file.
 
     Returns a dict of lowercased keys -> string values.
     Stops reading at the closing '---' line.
     Returns an empty dict if no frontmatter is present.
     """
-    result: dict = {}
+    result: dict[str, str] = {}
     try:
         lines = filepath.read_text(encoding="utf-8").splitlines()
         if not lines or lines[0].strip() != "---":
@@ -183,19 +190,19 @@ def _extract_description(filepath: Path) -> str:
 
 def deploy_agents(
     script_dir: Path,
-    selected_repos: list,
-    selected_agents: list,
+    selected_repos: list[str],
+    selected_agents: list[AgentRecord],
     logger: logging.Logger,
     test_mode: bool = False,
-) -> list:
+) -> list[str]:
     """
-    Copy selected agent files into the .github/personas/ folder of each selected
+    Copy selected agent files into the .github/agents/ folder of each selected
     repository, creating directories as needed.
 
     Returns a list of human-readable result messages.
     """
     parent_dir = script_dir.parent
-    messages = []
+    messages: list[str] = []
 
     for repo_name in selected_repos:
         repo_path = parent_dir / repo_name
@@ -269,19 +276,23 @@ class DeployAgentsApp(tk.Tk):
     def __init__(
         self,
         script_dir: Path,
-        repos: list,
-        agents: list,
+        repos: list[str],
+        agents: list[AgentRecord],
         logger: logging.Logger,
         test_mode: bool = False,
-    ):
+    ) -> None:
         super().__init__()
         self.script_dir = script_dir
+        self.all_repos: list[str]
+        self.all_agents: list[AgentRecord]
+        self.repo_vars: dict[str, tk.BooleanVar]
+        self.agent_vars: dict[str, tk.BooleanVar]
         self.all_repos = repos
         self.all_agents = agents
         self.logger = logger
         self.test_mode = test_mode
 
-        self.title("Deploy GitHub Copilot Agents")
+        self.title("Deploy Custom Agents")
         self.resizable(True, True)
         self.minsize(720, 540)
 
@@ -293,6 +304,31 @@ class DeployAgentsApp(tk.Tk):
     # UI construction
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _configure_canvas_scrollregion(
+        canvas: tk.Canvas,
+        event: tk.Event[tk.Widget] | None = None,
+    ) -> None:
+        _ = event
+        canvas.configure(scrollregion=canvas.bbox("all"))
+
+    @staticmethod
+    def _scroll_canvas(canvas: tk.Canvas, *args: str) -> None:
+        if not args:
+            return
+        command = args[0]
+        if command == "moveto" and len(args) >= 2:
+            canvas.yview_moveto(float(args[1]))
+        elif command == "scroll" and len(args) >= 3:
+            amount = int(args[1])
+            scroll_what = args[2]
+            if scroll_what == "units":
+                canvas.yview_scroll(amount, "units")
+            elif scroll_what == "pages":
+                canvas.yview_scroll(amount, "pages")
+            elif scroll_what == "pixels":
+                canvas.yview_scroll(amount, "pixels")
+
     def _build_ui(self):
         main = ttk.Frame(self, padding=12)
         main.pack(fill=tk.BOTH, expand=True)
@@ -300,9 +336,17 @@ class DeployAgentsApp(tk.Tk):
         # ---- Title ----
         ttk.Label(
             main,
-            text="Deploy GitHub Copilot Agent Files",
+            text="Deploy Custom Agents",
             font=self._TITLE_FONT,
         ).pack(pady=(0, 10))
+
+        # ---- Descriptor paragraph ----
+        ttk.Label(
+            main,
+            text="Selected Github Copilot Agents will be Deployed in the Repos Selected. Click here for instructions on using an agent.",
+            font=("TkDefaultFont", 10),
+            foreground="gray"
+        ).pack(pady=(0, 12))
 
         # ---- Two-column selection area ----
         cols = ttk.Frame(main)
@@ -337,7 +381,7 @@ class DeployAgentsApp(tk.Tk):
         )
         self.submit_btn.pack(side=tk.RIGHT)
 
-    def _build_repo_panel(self, parent):
+    def _build_repo_panel(self, parent: ttk.Frame) -> None:
         import os
         frame = ttk.LabelFrame(parent, text="Repositories", padding=6)
         frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
@@ -347,7 +391,8 @@ class DeployAgentsApp(tk.Tk):
         label_frame = ttk.Frame(frame)
         label_frame.pack(anchor="w", fill=tk.X)
         # Clickable link-style label for local repo root
-        def open_explorer(event=None):
+        def open_explorer(event: tk.Event[tk.Widget] | None = None) -> None:
+            _ = event
             os.startfile(local_root)
         # Normal label for description
         desc_label = ttk.Label(
@@ -381,17 +426,21 @@ class DeployAgentsApp(tk.Tk):
         outer = ttk.Frame(frame)
         outer.pack(fill=tk.BOTH, expand=True)
         canvas = tk.Canvas(outer, height=220, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        scrollbar = ttk.Scrollbar(
+            outer,
+            orient="vertical",
+            command=lambda *args: self._scroll_canvas(canvas, *args),
+        )
         inner = ttk.Frame(canvas)
         inner.bind(
             "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+            lambda event: self._configure_canvas_scrollregion(canvas, event),
         )
         canvas.create_window((0, 0), window=inner, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        self.repo_vars: dict = {}
+        self.repo_vars: dict[str, tk.BooleanVar] = {}
 
         if not self.all_repos:
             ttk.Label(
@@ -414,7 +463,7 @@ class DeployAgentsApp(tk.Tk):
                     command=self._update_preview,
                 ).grid(row=row, column=col, sticky="w", padx=2, pady=1)
 
-    def _build_agent_panel(self, parent):
+    def _build_agent_panel(self, parent: ttk.Frame) -> None:
         frame = ttk.LabelFrame(parent, text="Agents", padding=6)
         frame.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
 
@@ -428,52 +477,103 @@ class DeployAgentsApp(tk.Tk):
         ).pack(anchor="w")
         ttk.Separator(frame, orient="horizontal").pack(fill="x", pady=4)
 
-        # Scrollable list
-        inner = self._scrollable_inner(frame)
-        self.agent_vars: dict = {}
+        # Scrollable list with up to 4 columns
+        outer = ttk.Frame(frame)
+        outer.pack(fill=tk.BOTH, expand=True)
+        canvas = tk.Canvas(outer, height=220, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(
+            outer,
+            orient="vertical",
+            command=lambda *args: self._scroll_canvas(canvas, *args),
+        )
+        inner = ttk.Frame(canvas)
+        inner.bind(
+            "<Configure>",
+            lambda event: self._configure_canvas_scrollregion(canvas, event),
+        )
+        canvas.create_window((0, 0), window=inner, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.agent_vars: dict[str, tk.BooleanVar] = {}
+
+        # Tooltip widget
+        import textwrap
+        class ToolTip:
+            def __init__(self, widget: tk.Widget, text: str) -> None:
+                self.widget = widget
+                self.text = text
+                self.tipwindow: tk.Toplevel | None = None
+                widget.bind("<Enter>", self.show_tip)
+                widget.bind("<Leave>", self.hide_tip)
+
+            def show_tip(self, event: tk.Event[tk.Widget] | None = None) -> None:
+                _ = event
+                if self.tipwindow or not self.text:
+                    return
+                x = self.widget.winfo_rootx() + 40
+                y = self.widget.winfo_rooty() + 20
+                self.tipwindow = tw = tk.Toplevel(self.widget)
+                tw.wm_overrideredirect(True)
+                tw.wm_geometry(f"+{x}+{y}")
+                wrapped_text = '\n'.join(textwrap.wrap(self.text, 35))
+                label = tk.Label(
+                    tw,
+                    text=wrapped_text,
+                    justify=tk.LEFT,
+                    background="#ffffe0",
+                    relief=tk.SOLID,
+                    borderwidth=1,
+                    font=("TkDefaultFont", 9)
+                )
+                label.pack(ipadx=1)
+
+            def hide_tip(self, event: tk.Event[tk.Widget] | None = None) -> None:
+                _ = event
+                tw = self.tipwindow
+                self.tipwindow = None
+                if tw:
+                    tw.destroy()
 
         if not self.all_agents:
             ttk.Label(
                 inner,
                 text="No agent *.md files found in personas/",
                 foreground=self._DESC_COLOR,
-            ).pack(anchor="w")
+            ).grid(row=0, column=0, sticky="w")
         else:
-            for agent in self.all_agents:
+            num_cols = min(4, max(1, (len(self.all_agents) + 9) // 10))
+            for idx, agent in enumerate(self.all_agents):
                 var = tk.BooleanVar(value=False)
                 self.agent_vars[agent["source_filename"]] = var
-
-                row = ttk.Frame(inner)
-                row.pack(anchor="w", fill=tk.X, pady=(2, 0))
-
-                ttk.Checkbutton(
-                    row,
+                row = idx // num_cols
+                col = idx % num_cols
+                cb = ttk.Checkbutton(
+                    inner,
                     text=agent["display_name"],
                     variable=var,
                     command=self._update_preview,
-                ).pack(anchor="w")
-
-                if agent["description"]:
-                    ttk.Label(
-                        row,
-                        text=f"    {agent['description']}",
-                        foreground=self._DESC_COLOR,
-                        wraplength=self._WRAP_PX,
-                    ).pack(anchor="w")
+                )
+                cb.grid(row=row, column=col, sticky="w", padx=2, pady=1)
+                ToolTip(cb, agent["description"])
 
     @staticmethod
-    def _scrollable_inner(parent) -> ttk.Frame:
+    def _scrollable_inner(parent: ttk.Frame) -> ttk.Frame:
         """Create a canvas+scrollbar combo and return the inner Frame."""
         outer = ttk.Frame(parent)
         outer.pack(fill=tk.BOTH, expand=True)
 
         canvas = tk.Canvas(outer, height=220, highlightthickness=0)
-        scrollbar = ttk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        scrollbar = ttk.Scrollbar(
+            outer,
+            orient="vertical",
+            command=lambda *args: DeployAgentsApp._scroll_canvas(canvas, *args),
+        )
         inner = ttk.Frame(canvas)
 
         inner.bind(
             "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all")),
+            lambda event: DeployAgentsApp._configure_canvas_scrollregion(canvas, event),
         )
         canvas.create_window((0, 0), window=inner, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
@@ -510,12 +610,12 @@ class DeployAgentsApp(tk.Tk):
     # Selection helpers
     # ------------------------------------------------------------------
 
-    def _get_selected_repos(self) -> list:
+    def _get_selected_repos(self) -> list[str]:
         if self.all_repos_var.get():
             return list(self.all_repos)
         return [repo for repo, var in self.repo_vars.items() if var.get()]
 
-    def _get_selected_agents(self) -> list:
+    def _get_selected_agents(self) -> list[AgentRecord]:
         if self.all_agents_var.get():
             return list(self.all_agents)
         return [
@@ -545,7 +645,7 @@ class DeployAgentsApp(tk.Tk):
             repo_str = "None"
 
         if agents:
-            names = [a["display_name"] for a in agents]
+            names: list[str] = [a["display_name"] for a in agents]
             if self.all_agents_var.get():
                 agent_str = f"ALL agents ({', '.join(names)})"
             else:
@@ -557,9 +657,9 @@ class DeployAgentsApp(tk.Tk):
             f"Repositories : {repo_str}\n"
             f"Agents       : {agent_str}\n\n"
             "Selected agent file(s) will be copied into the "
-            ".github/personas/ folder of each selected repository. "
+            ".github/agents/ folder of each selected repository. "
             "Missing folders will be created automatically. "
-            "Destination files that are already newer will NOT be overwritten."
+            "Destination agents that are already newer will NOT be overwritten."
         )
 
     # ------------------------------------------------------------------
@@ -585,7 +685,8 @@ class DeployAgentsApp(tk.Tk):
 
         # Log the user selection
         repo_names = ", ".join(repos)
-        agent_names = ", ".join(a["display_name"] for a in agents)
+        agent_name_list: list[str] = [a["display_name"] for a in agents]
+        agent_names = ", ".join(agent_name_list)
         all_r = self.all_repos_var.get()
         all_a = self.all_agents_var.get()
 
@@ -625,7 +726,13 @@ class DeployAgentsApp(tk.Tk):
             return
 
         # Run deployment
-        messages = deploy_agents(self.script_dir, repos, agents, self.logger)
+        messages = deploy_agents(
+            self.script_dir,
+            repos,
+            agents,
+            self.logger,
+            test_mode=self.test_mode,
+        )
 
         # Show result summary
         result_text = "\n".join(messages) if messages else "No file operations were performed."
@@ -647,7 +754,7 @@ def main():
     logger.info("deploy_agents.py started.")
 
     repos = find_sibling_repos(script_dir)
-    agents = find_agent_files(script_dir)
+    agents: list[AgentRecord] = find_agent_files(script_dir)
 
     logger.info(
         "Found %d sibling repository(s): %s",
@@ -666,7 +773,7 @@ def main():
         messagebox.showerror(
             "No Agent Files Found",
             f"No agent *.md files were found in:\n"
-            f"  {script_dir / "personas"}\n\n"
+            f"  {script_dir / 'personas'}\n\n"
             "Please add agent files before running this script.",
         )
         logger.error("No agent files found. Exiting.")

@@ -1,4 +1,5 @@
 ---
+name: UI-Expert
 description: 'UI/UX + Java expert: design-first, modernization-focused, concise with practical analogies and safe refactoring guidance. Clean, stable UI improvements with minimal user disruption.'
 tools:
 	['edit', 'runNotebooks', 'search', 'new', 'runCommands', 'runTasks', 'usages', 'vscodeAPI', 'problems', 'changes', 'testFailure', 'openSimpleBrowser', 'fetch', 'githubRepo', 'ms-python.python/getPythonEnvironmentInfo', 'ms-python.python/getPythonExecutableCommand', 'ms-python.python/installPythonPackage', 'ms-python.python/configurePythonEnvironment', 'extensions', 'todos', 'runSubagent']
