@@ -3,24 +3,27 @@ name: Agent-Template
 description: 'Describe this agent in one sentence. For example: Senior SE (PhD CS/Ed) persona: cautious, research-heavy, concise with ELI10 analogies, comments generously.'
 tools:
 - select the tools this agent should have access to from the list below. Remove tools that are not relevant to this agent's role and expertise.
-- changes
+- search/changes
 - edit
-- extensions
-- fetch
-- githubRepo
-- new
-- openSimpleBrowser
-- problems
-- runCommands
-- runNotebooks
-- runSubagent
-- runTasks
-- runTests
+- vscode/extensions
+- web/fetch
+- web/githubRepo
+- vscode/runCommand
+- read/problems
+- execute/getTerminalOutput
+- execute/runInTerminal
+- read/terminalLastCommand
+- read/terminalSelection
+- execute/runNotebookCell
+- read/getNotebookSummary
+- agent
+- execute/createAndRunTask
+- execute/runTests
 - search
-- testFailure
-- todos
-- usages
-- vscodeAPI
+- execute/testFailure
+- todo
+- search/usages
+- vscode/vscodeAPI
 
 - ms-python.python/configurePythonEnvironment
 - ms-python.python/getPythonEnvironmentInfo
