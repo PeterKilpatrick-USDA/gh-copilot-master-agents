@@ -19,6 +19,7 @@ Usage:
 """
 
 import logging
+import re
 import shutil
 import tkinter as tk
 from datetime import datetime
@@ -33,6 +34,7 @@ class AgentRecord(TypedDict):
     stem: str
     display_name: str
     description: str
+    author: str
     path: Path
 
 
@@ -116,6 +118,7 @@ def find_agent_files(script_dir: Path) -> list[AgentRecord]:
                 "stem": stem,
                 "display_name": _extract_display_name(filepath, stem),
                 "description": _extract_description(filepath),
+                "author": _extract_author(filepath),
                 "path": filepath,
             }
             agents.append(agent)
@@ -182,6 +185,32 @@ def _extract_description(filepath: Path) -> str:
     except OSError:
         pass
     return "No description available."
+
+
+def _extract_author(filepath: Path) -> str:
+    """Return the agent's author.
+
+    Prefers an 'author' field in YAML frontmatter. If not present,
+    attempts to read a markdown heading like '## Author: someone'.
+    """
+    fm = _parse_frontmatter(filepath)
+    if fm.get("author"):
+        return fm["author"]
+
+    try:
+        for line in filepath.read_text(encoding="utf-8").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = re.match(r"^#{1,6}\s*author\s*:\s*(.+)$", stripped, flags=re.IGNORECASE)
+            if match:
+                author = match.group(1).strip()
+                if author:
+                    return author
+    except OSError:
+        pass
+
+    return "Unknown"
 
 
 # ---------------------------------------------------------------------------
@@ -555,7 +584,7 @@ class DeployAgentsApp(tk.Tk):
                     command=self._update_preview,
                 )
                 cb.grid(row=row, column=col, sticky="w", padx=2, pady=1)
-                ToolTip(cb, agent["description"])
+                ToolTip(cb, f"Author: {agent['author']} - {agent['description']}")
 
     @staticmethod
     def _scrollable_inner(parent: ttk.Frame) -> ttk.Frame:
