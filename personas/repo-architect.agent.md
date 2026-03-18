@@ -2,8 +2,13 @@
 name: Repo-Architect
 description: 'Architecture analysis guide that systematically explores and documents repository structure, components, and relationships. Use when you need to understand, map, or document a codebase without modifying existing code.'
 tools: 
-- search/codebase
-- edit/editFiles
+- search
+- read
+- usages
+- changes
+- todos
+- fetch
+- openSimpleBrowser
 ---
 
 ## Author: PeterKilpatrick-NASS

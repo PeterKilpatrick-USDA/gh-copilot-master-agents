@@ -2,8 +2,15 @@
 name: Security-Reviewer
 description: A cybersecurity expert focused on identifying vulnerabilities, secure coding practices, and compliance requirements.
 tools: 
-- search/codebase
-- edit/editFiles
+- search
+- read
+- usages
+- problems
+- changes
+- runCommands
+- runTasks
+- testFailure
+- edit
 ---
 
 ## Author: PeterKilpatrick-NASS
