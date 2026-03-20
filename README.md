@@ -33,15 +33,15 @@ python deploy_agents.py
 
 Select your target repositories and agents, then click **Submit** to deploy:
 
-<img src="https://github.com/user-attachments/assets/2218b1bb-997e-42ec-a4a4-fdeefb35651a" width="750">
+<img src="https://github.com/user-attachments/assets/dd7f45c9-a7d5-4424-b365-7f49130b4a35" width="750">
 
-Hovering over an agent name shows its author and description:
+A confirmation dialog summarizes your selections before deployment proceeds:
 
-<img src="https://github.com/user-attachments/assets/1ff1d89b-a62d-4d0f-b0e7-00aa19d1b0fa" width="750">
+<img src="https://github.com/user-attachments/assets/ad0fa317-a944-46ed-98df-48d2eeed4122" width="450">
 
-After submitting, a summary dialog confirms which files were copied or skipped:
+After deployment, a results dialog shows which files were copied or skipped:
 
-<img src="https://github.com/user-attachments/assets/bb21deac-60e7-4d9b-93c1-969ea5925ac9" width="450">
+<img src="https://github.com/user-attachments/assets/ff3be895-bd11-4575-ade0-6f3e950303c9" width="450">
 
 ### Using a Deployed Agent in VS Code
 
