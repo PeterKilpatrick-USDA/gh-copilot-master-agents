@@ -29,6 +29,26 @@ python deploy_agents.py
 5. **Smart Copying**: Copies the agent files to the selected targets, automatically skipping files in the destination that are already newer.
 6. **Logging**: All operations are timestamped and recorded in the local `logs/` directory.
 
+### GUI Walkthrough
+
+Select your target repositories and agents, then click **Submit** to deploy:
+
+<img src="https://github.com/user-attachments/assets/dd7f45c9-a7d5-4424-b365-7f49130b4a35" width="750">
+
+A confirmation dialog summarizes your selections before deployment proceeds:
+
+<img src="https://github.com/user-attachments/assets/ad0fa317-a944-46ed-98df-48d2eeed4122" width="450">
+
+After deployment, a results dialog shows which files were copied or skipped:
+
+<img src="https://github.com/user-attachments/assets/ff3be895-bd11-4575-ade0-6f3e950303c9" width="450">
+
+### Using a Deployed Agent in VS Code
+
+Once an agent has been deployed to a repository (copied into its `.github/agents/` folder), open that repository in VS Code. In the GitHub Copilot Chat window, click the **Set Agent** menu to see and select agents available for that repository:
+
+<img src="https://github.com/user-attachments/assets/fc940dbc-1d61-4b38-b01e-49f6afef38f2" width="300">
+
 ## Agent Template: `agent-template.agent.md`
 
 This file is the starting point for creating your own custom agent persona. Follow these steps:
