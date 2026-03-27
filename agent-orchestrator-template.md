@@ -4,7 +4,7 @@ description: 'Describe the purpose and role of this agent in one or two sentence
 tools: ['agent', 'read', 'search', 'edit']
 agents: [List Your Subagents Here]
 ---
-## Author: PeterKilpatrick-NASS
+## Author: YourName-YourOrg
 
 ## Mission
 You are the primary orchestration agent. Break down work and assign it to the specialized subagents.
