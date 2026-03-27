@@ -1,5 +1,7 @@
 # gh-copilot-master-agents
 
+<img src="docs/images/Main-Menu.png" width="300">
+
 This repository serves as the master list of NASS agent personas for use in VS Code with GitHub Copilot. It centralizes custom instructions, roles, and guidelines for different AI personas (e.g., C# Expert, Data Scientist, Security Reviewer). 
 
 ## What This Repo Does
@@ -47,7 +49,7 @@ After deployment, a results dialog shows which files were copied or skipped:
 
 Once an agent has been deployed to a repository (copied into its `.github/agents/` folder), open that repository in VS Code. In the GitHub Copilot Chat window, click the **Set Agent** menu to see and select agents available for that repository:
 
-<img src="docs/images/confirm-deployment.png" width="300">
+<img src="docs/images/Main-Menu.png" width="300">
 
 ## Agent Template: `agent-template.agent.md`
 
