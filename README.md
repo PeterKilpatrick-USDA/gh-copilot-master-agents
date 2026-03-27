@@ -96,5 +96,20 @@ These tools are available when Python support is enabled in your VS Code environ
 
 > **Tip:** Review the template and create your own agent that others can use!
 
+## Orchestrator Template: `agent-orchestrator-template.md`
+
+This repository includes an orchestrator persona template (`agent-orchestrator-template.md`) you can use to coordinate focused agents (subagents) into a simple multi-step workflow.
+
+How to use the orchestrator
+1. Customize the orchestrator: copy `agent-orchestrator-template.md` into `personas/`, rename it with a clear persona name, and update the frontmatter and instructions.
+2. Prepare subagents: create focused `.agent.md` files for each role; keep responsibilities narrow and well-defined.
+3. Deploy the orchestration set: use `deploy_agents.py` (or copy files) to deploy the orchestrator and subagents to the target repository's `.github/agents/` directory.
+4. Run in VS Code: open the target repo, select the orchestrator agent in Copilot Chat, and ask it to run your workflow. The orchestrator typically delegates work to subagents via the `runSubagent` tool, aggregates outputs, and returns the final result.
+
+Tips
+- Keep subagents small and test them individually before composing them under an orchestrator.
+- Define clear input/output contracts so the orchestrator can reliably combine subagent outputs.
+- See `docs/subagents-info.md` for examples and recommended patterns.
+
 ## Worth Exploring
 Organization-level custom agents are supported. Organization owners can create a repository named `.github-private` and store agent files in the root `agents/` directory, for example `agents/CUSTOM-AGENT-NAME.agent.md`. In VS Code, users can discover these agents across the organization when `github.copilot.chat.organizationCustomAgents.enabled` is enabled and they have access to the organization agent repository. [Click here for more information.](https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-for-organization/prepare-for-custom-agents)
