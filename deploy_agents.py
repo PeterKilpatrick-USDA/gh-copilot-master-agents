@@ -478,13 +478,16 @@ class DeployAgentsApp(tk.Tk):
                 foreground=self._DESC_COLOR,
             ).grid(row=0, column=0, sticky="w")
         else:
-            # Arrange checkboxes in up to 4 columns
-            num_cols = min(4, max(1, (len(self.all_repos) + 9) // 10))
+            # Arrange checkboxes in 2 long columns (vertical first)
+            num_cols = 2
+            total = len(self.all_repos)
+            rows = (total + num_cols - 1) // num_cols
             for idx, repo in enumerate(self.all_repos):
                 var = tk.BooleanVar(value=False)
                 self.repo_vars[repo] = var
-                row = idx // num_cols
-                col = idx % num_cols
+                # fill down each column before moving to the next
+                row = idx % rows
+                col = idx // rows
                 ttk.Checkbutton(
                     inner,
                     text=repo,
@@ -571,12 +574,15 @@ class DeployAgentsApp(tk.Tk):
                 foreground=self._DESC_COLOR,
             ).grid(row=0, column=0, sticky="w")
         else:
-            num_cols = min(4, max(1, (len(self.all_agents) + 9) // 10))
+            # Arrange agent checkboxes in 2 long columns (vertical first)
+            num_cols = 2
+            total = len(self.all_agents)
+            rows = (total + num_cols - 1) // num_cols
             for idx, agent in enumerate(self.all_agents):
                 var = tk.BooleanVar(value=False)
                 self.agent_vars[agent["source_filename"]] = var
-                row = idx // num_cols
-                col = idx % num_cols
+                row = idx % rows
+                col = idx // rows
                 cb = ttk.Checkbutton(
                     inner,
                     text=agent["display_name"],
